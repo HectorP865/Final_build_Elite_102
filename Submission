@@ -1,0 +1,185 @@
+import sqlite3
+
+from tkinter import *
+
+import tkinter as tk
+
+conn = sqlite3.connect(':memory:')
+
+c = conn.cursor()
+
+c.execute("""CREATE TABLE account (
+first text,
+PIN integer,
+balance integer
+)""")
+
+conn.commit()
+
+#-----------------------------------------------------
+
+# the main menu that the return function goes back too.
+def main_menu():
+  try:
+    main_window = tk.Tk()
+    main_window.geometry("420x420")
+    main_window.title("Main Menu")
+    main_window.configure(background="#190192")
+    main_label = Label(main_window,
+                 text="Welcome!",
+                 font=("Arial", 25),
+                 fg="white",
+                 bg="#027EC6",
+                 relief=RAISED,
+                 bd=10,
+                 padx=10,
+                 pady=10)
+    main_label.pack()
+    #the ui user interface entry box
+
+    create_button = Button(main_window,
+     text="create account",
+     command=lambda: create_account(c))
+    create_button.pack()
+
+    login_button = Button(main_window,
+     text="login",
+     command=lambda: login(c))
+    login_button.pack()
+
+
+
+    exit_button = Button(main_window,
+     text= "exit",
+     command=lambda: exit())
+    exit_button.pack()
+
+    main_window.mainloop()
+
+  except ValueError:
+    print("PIN and balance have to be integers.")
+  
+      
+#----------------------------------------------
+
+#this function creates account and adds it to the database.
+
+def create_account(c):
+  with conn:
+      first = input('Please enter your first name: ')
+      PIN = int(input('Please enter a PIN: '))
+      balance = int(input('Please enter a balance: '))
+  c.execute("INSERT INTO account VALUES (:first, :PIN, :balance)", 
+                  {'first': first, 'PIN': PIN, 'balance': balance})
+#---------------------------------------------
+
+#After creating an account, and putting in the PIN able to acess this menu for custom account optiones
+
+try:
+  def sing_in_menu(login_PIN):
+    print('-------------------------------------------')
+    c.execute("SELECT * FROM account WHERE PIN = :login_PIN", {"login_PIN": login_PIN})
+    result = c.fetchone()
+    if result:
+        first = result[0]
+        balance = result[2]  # Access the balance directly from the fetched row
+        print(f'Welcome {first}! What option would you like to choose? Balance: {balance}$')
+        print('1. Deposit\n2. Withdraw\n3. Delete account\n4. Return')
+        account_choice = int(input('Please choose from the following options: '))
+
+        if account_choice == 1:
+            deposit(login_PIN, balance)
+        if account_choice == 2:
+            withdraw(login_PIN, balance)
+        if account_choice == 3:
+            delete_account(login_PIN, c)
+        if account_choice == 4:
+            return_main_menu()
+    else:
+      print("invalid PIN")
+      main_menu()
+except ValueError:
+  print("PIN and balance have to be integers.")
+
+#---------------------------------------------
+
+#this is the function for entering the PIN and checking if it is correct
+
+def login(c):
+  try:
+    login_PIN = input("Please enter your PIN: ")
+    c = conn.cursor()
+    c.execute("SELECT * FROM account WHERE PIN = ?", (login_PIN,))
+    sing_in_menu(login_PIN)
+  except ValueError:
+    print("PIN has to be a integer.")
+
+#---------------------------------------------
+
+#functino for delelting the account created with PIN
+
+def delete_account(login_PIN, c):
+  verification = input("To delete account need verification through PIN.\nPleas enter PIN: ")
+  if verification == login_PIN:
+    c.execute("DELETE FROM account WHERE PIN = :login_PIN", {"login_PIN": login_PIN})
+    print("successfully deleted!")
+    main_menu()
+  else:
+    print("invalid verification")
+    main_menu()
+
+
+#---------------------------------------------
+
+#function for depositing money into the account
+
+def deposit(login_PIN, balance):
+  try:
+    deposit_amount = int(input("Please enter the money you would like to deposit: "))
+    updated_balance = balance + deposit_amount
+    c.execute("UPDATE account SET balance = :balance WHERE PIN = :login_PIN", 
+               {'balance': updated_balance, 'login_PIN': login_PIN})
+    print(f"You have successfully deposited {deposit_amount}$. New balance is {updated_balance}$")
+    # Update and display the current balance after deposit
+    c.execute("SELECT * FROM account WHERE PIN = ?", (login_PIN,))
+    result = c.fetchone()
+    balance = result[2]
+    sing_in_menu(login_PIN)
+  except ValueError:
+    print("PIN and balance have to be integers.")
+
+#---------------------------------------------
+
+#the functino to withdraw money with PIN.
+
+def withdraw(login_PIN, balance):
+  try:
+    withdraw_amount = int(input("Please enter the amount of money you are withdrawing: "))
+    updated_balance = balance - withdraw_amount
+    c.execute("UPDATE account SET balance = :balance WHERE PIN = :login_PIN",
+               {'balance': updated_balance, 'login_PIN': login_PIN})
+    print(f"You have successfully withdrawn {withdraw_amount}$. New balance is {updated_balance}$")
+    sing_in_menu(login_PIN)
+    if withdraw_amount > balance:
+      print("Insufficient balance")
+      sing_in_menu(login_PIN)
+  except ValueError:
+    print("PIN and balance have to be integers.")
+
+#---------------------------------------------
+
+#return to the main menu in case want to log out of account
+
+def return_main_menu():
+  main_menu()
+
+#---------------------------------------------
+
+#instead of returning to the main menu it sends you to the exit function
+
+def exit():
+  print("Thank you for using our banking application!")
+
+#---------------------------------------------
+
+main_menu()
